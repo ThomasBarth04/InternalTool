@@ -15,7 +15,7 @@ There is not a great UI yet and maybe only i understand how to use it now since 
 ## Install (one-line)
 
 These commands download the app from GitHub Releases and install it. Copy the whole line and paste it into Terminal.
-
+You have to be logged in as admin to be able to install from a link, but when you have installed it from admin you should be able to open from standard user
 ### macOS
 
 ```bash
