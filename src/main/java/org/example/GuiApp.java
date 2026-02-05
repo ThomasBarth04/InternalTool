@@ -117,8 +117,8 @@ public class GuiApp implements App {
 
 	private void applyScaling() {
 		Dimension screen = Toolkit.getDefaultToolkit().getScreenSize();
-		double scale = Math.max(1.0, screen.width / 1920.0);
-		scale = Math.min(scale, 1.5);
+		double scale = Math.max(2, screen.width / 1920.0);
+		scale = Math.min(scale, 2);
 		Font baseFont = UIManager.getFont("Label.font");
 		if (baseFont == null) {
 			return;

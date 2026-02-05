@@ -60,7 +60,7 @@ public class ExcelCompareFeature implements ToolFeature {
 						"mode",
 						"Comparison mode",
 						false,
-						java.util.List.of("union", "left-only", "right-only", "symmetric-diff", "changes")
+						java.util.List.of("union", "left-only", "right-only", "symmetric-diff", "changes (old - new)")
 				),
 				FeatureArgument.text("sheet", "Sheet name (optional)", false),
 				FeatureArgument.mapping("map", "Header mapping", true)
