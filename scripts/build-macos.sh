@@ -21,12 +21,16 @@ mkdir -p "$INPUT_DIR"
 cp "target/$JAR_NAME" "$INPUT_DIR/"
 cp target/dependency/*.jar "$INPUT_DIR/"
 
+CLASSPATH=$(ls "$INPUT_DIR"/*.jar | xargs -n1 basename | paste -sd ":" -)
+
 jpackage \
   --type dmg \
   --dest "$DIST_DIR" \
   --name "$APP_NAME" \
   --app-version "$VERSION" \
   --input "$INPUT_DIR" \
-  --main-jar "$JAR_NAME"
+  --main-jar "$JAR_NAME" \
+  --main-class "org.example.Main" \
+  --class-path "$CLASSPATH"
 
 echo "Created $DIST_DIR/$APP_NAME-$VERSION.dmg"
