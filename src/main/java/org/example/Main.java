@@ -5,10 +5,8 @@ import java.util.Arrays;
 public class Main {
 	public static void main(String[] args) {
 		App app = new GuiApp();
-		String[] remaining = stripModeArg(args);
-		app.run(remaining);
+		app.run(stripModeArg(args));
 	}
-
 
 	private static String[] stripModeArg(String[] args) {
 		if (args.length == 0) {

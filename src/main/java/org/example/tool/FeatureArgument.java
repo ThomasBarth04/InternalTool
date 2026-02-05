@@ -7,7 +7,8 @@ public class FeatureArgument {
 		TEXT,
 		FILE,
 		CHOICE,
-		FLAG
+		FLAG,
+		MAPPING
 	}
 
 	private final String key;
@@ -38,6 +39,10 @@ public class FeatureArgument {
 
 	public static FeatureArgument flag(String key, String label) {
 		return new FeatureArgument(key, label, false, Type.FLAG, List.of());
+	}
+
+	public static FeatureArgument mapping(String key, String label, boolean required) {
+		return new FeatureArgument(key, label, required, Type.MAPPING, List.of());
 	}
 
 	public String key() {

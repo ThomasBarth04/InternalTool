@@ -1,6 +1,7 @@
 package org.example;
 
 import org.example.tool.ExcelCompareFeature;
+import org.example.tool.ExcelHeaderReader;
 import org.example.tool.FeatureArgument;
 import org.example.tool.FeatureRegistry;
 import org.example.tool.ToolFeature;
@@ -19,6 +20,7 @@ import javax.swing.JTextField;
 import javax.swing.SwingUtilities;
 import javax.swing.SwingWorker;
 import javax.swing.UIManager;
+import javax.swing.filechooser.FileNameExtensionFilter;
 import java.awt.BorderLayout;
 import java.awt.Dimension;
 import java.awt.Font;
@@ -27,12 +29,21 @@ import java.awt.GridBagLayout;
 import java.awt.Insets;
 import java.awt.Toolkit;
 import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.io.PrintStream;
+import java.io.FileOutputStream;
+import java.nio.file.Path;
 import java.util.Enumeration;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Locale;
+
+import org.apache.poi.ss.usermodel.Row;
+import org.apache.poi.ss.usermodel.Sheet;
+import org.apache.poi.ss.usermodel.Workbook;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 
 public class GuiApp implements App {
 	private final FeatureRegistry registry = new FeatureRegistry();
@@ -80,6 +91,9 @@ public class GuiApp implements App {
 		centerPanel.setBorder(BorderFactory.createEmptyBorder(0, 12, 0, 12));
 
 		JPanel bottomPanel = new JPanel(new BorderLayout(8, 8));
+		JButton exportButton = new JButton("Export Output");
+		exportButton.addActionListener(event -> exportOutput());
+		bottomPanel.add(exportButton, BorderLayout.WEST);
 		JButton runButton = new JButton("Run");
 		runButton.addActionListener(event -> runSelectedFeature());
 		bottomPanel.add(runButton, BorderLayout.EAST);
@@ -167,6 +181,11 @@ public class GuiApp implements App {
 					argsPanel.add(checkBox, constraints);
 					inputComponents.put(argument.key(), checkBox);
 				}
+				case MAPPING -> {
+					MappingPanel mappingPanel = new MappingPanel();
+					argsPanel.add(mappingPanel, constraints);
+					inputComponents.put(argument.key(), mappingPanel);
+				}
 				default -> {
 					JTextField field = new JTextField();
 					argsPanel.add(field, constraints);
@@ -195,18 +214,33 @@ public class GuiApp implements App {
 
 		for (FeatureArgument argument : feature.arguments()) {
 			Object component = inputComponents.get(argument.key());
-			String value = readComponentValue(component);
-
-			if (argument.required() && (value == null || value.isBlank())) {
-				outputArea.setText("Missing required input: " + argument.label());
-				return;
-			}
 
 			if (argument.type() == FeatureArgument.Type.FLAG) {
+				String value = readComponentValue(component);
 				if ("true".equalsIgnoreCase(value)) {
 					args.add("--" + argument.key());
 				}
 				continue;
+			}
+
+			if (argument.type() == FeatureArgument.Type.MAPPING) {
+				MappingPanel mappingPanel = (MappingPanel) component;
+				List<HeaderPair> pairs = mappingPanel.getMappings();
+				if (argument.required() && pairs.isEmpty()) {
+					outputArea.setText("Missing required input: " + argument.label());
+					return;
+				}
+				for (HeaderPair pair : pairs) {
+					args.add("--" + argument.key());
+					args.add(pair.left + "=" + pair.right);
+				}
+				continue;
+			}
+
+			String value = readComponentValue(component);
+			if (argument.required() && (value == null || value.isBlank())) {
+				outputArea.setText("Missing required input: " + argument.label());
+				return;
 			}
 
 			if (value != null && !value.isBlank()) {
@@ -249,6 +283,94 @@ public class GuiApp implements App {
 		worker.execute();
 	}
 
+	private void exportOutput() {
+		String output = outputArea.getText();
+		if (output == null || output.isBlank()) {
+			outputArea.setText("Nothing to export yet.");
+			return;
+		}
+		JFileChooser chooser = new JFileChooser();
+		chooser.setDialogTitle("Export Output");
+		FileNameExtensionFilter xlsxFilter = new FileNameExtensionFilter("Excel (*.xlsx)", "xlsx");
+		chooser.addChoosableFileFilter(xlsxFilter);
+		chooser.setFileFilter(xlsxFilter);
+		int result = chooser.showSaveDialog(argsPanel);
+		if (result != JFileChooser.APPROVE_OPTION) {
+			return;
+		}
+		Path target = ensureExtension(chooser.getSelectedFile().toPath(), "xlsx");
+		try {
+			writeXlsx(target, output);
+		} catch (IOException exception) {
+			outputArea.setText("Failed to export: " + exception.getMessage());
+		}
+	}
+
+	private Path ensureExtension(Path path, String extension) {
+		String filename = path.getFileName().toString();
+		String lower = filename.toLowerCase(Locale.ROOT);
+		if (lower.endsWith("." + extension)) {
+			return path;
+		}
+		return path.resolveSibling(filename + "." + extension);
+	}
+
+	private void writeXlsx(Path target, String output) throws IOException {
+		try (Workbook workbook = new XSSFWorkbook()) {
+			Sheet sheet = workbook.createSheet("Output");
+			String[] lines = output.split("\\R", -1);
+			for (int i = 0; i < lines.length; i++) {
+				List<String> cells = parseCsvLine(lines[i]);
+				Row row = sheet.createRow(i);
+				for (int col = 0; col < cells.size(); col++) {
+					row.createCell(col).setCellValue(cells.get(col));
+				}
+			}
+			autoSizeColumns(sheet);
+			try (FileOutputStream out = new FileOutputStream(target.toFile())) {
+				workbook.write(out);
+			}
+		}
+	}
+
+	private List<String> parseCsvLine(String line) {
+		List<String> cells = new ArrayList<>();
+		StringBuilder current = new StringBuilder();
+		boolean inQuotes = false;
+		for (int i = 0; i < line.length(); i++) {
+			char ch = line.charAt(i);
+			if (ch == '"') {
+				if (inQuotes && i + 1 < line.length() && line.charAt(i + 1) == '"') {
+					current.append('"');
+					i++;
+				} else {
+					inQuotes = !inQuotes;
+				}
+				continue;
+			}
+			if (ch == ',' && !inQuotes) {
+				cells.add(current.toString());
+				current.setLength(0);
+				continue;
+			}
+			current.append(ch);
+		}
+		cells.add(current.toString());
+		return cells;
+	}
+
+	private void autoSizeColumns(Sheet sheet) {
+		int maxColumns = 0;
+		for (Row row : sheet) {
+			if (row.getLastCellNum() > maxColumns) {
+				maxColumns = row.getLastCellNum();
+			}
+		}
+		for (int col = 0; col < maxColumns; col++) {
+			sheet.autoSizeColumn(col);
+		}
+	}
+
 	private ToolFeature getSelectedFeature() {
 		String selected = (String) featureSelector.getSelectedItem();
 		ToolFeature feature = registry.get(selected);
@@ -277,5 +399,138 @@ public class GuiApp implements App {
 			return String.valueOf(checkBox.isSelected());
 		}
 		return null;
+	}
+
+	private class MappingPanel extends JPanel {
+		private final JComboBox<String> leftCombo = new JComboBox<>();
+		private final JComboBox<String> rightCombo = new JComboBox<>();
+		private final JTextArea mappingsArea = new JTextArea(4, 30);
+		private final List<HeaderPair> mappings = new ArrayList<>();
+
+		private MappingPanel() {
+			super(new BorderLayout(6, 6));
+			JPanel controls = new JPanel(new GridBagLayout());
+			GridBagConstraints constraints = new GridBagConstraints();
+			constraints.insets = new Insets(2, 2, 2, 2);
+			constraints.gridy = 0;
+			constraints.fill = GridBagConstraints.HORIZONTAL;
+
+			JButton scanButton = new JButton("Scan Headers");
+			scanButton.addActionListener(event -> scanHeaders());
+			constraints.gridx = 0;
+			constraints.gridwidth = 3;
+			controls.add(scanButton, constraints);
+
+			constraints.gridy++;
+			constraints.gridwidth = 1;
+			constraints.gridx = 0;
+			controls.add(new JLabel("Left"), constraints);
+			constraints.gridx = 1;
+			controls.add(new JLabel("Right"), constraints);
+
+			constraints.gridy++;
+			constraints.gridx = 0;
+			constraints.weightx = 1;
+			controls.add(leftCombo, constraints);
+			constraints.gridx = 1;
+			controls.add(rightCombo, constraints);
+			constraints.gridx = 2;
+			constraints.weightx = 0;
+			JButton addButton = new JButton("Add");
+			addButton.addActionListener(event -> addMapping());
+			controls.add(addButton, constraints);
+
+			constraints.gridy++;
+			constraints.gridx = 0;
+			constraints.gridwidth = 2;
+			JButton clearButton = new JButton("Clear");
+			clearButton.addActionListener(event -> clearMappings());
+			controls.add(clearButton, constraints);
+
+			mappingsArea.setEditable(false);
+			JScrollPane mappingScroll = new JScrollPane(mappingsArea);
+			mappingScroll.setBorder(BorderFactory.createTitledBorder("Mappings"));
+
+			add(controls, BorderLayout.NORTH);
+			add(mappingScroll, BorderLayout.CENTER);
+		}
+
+		private void scanHeaders() {
+			String leftPath = textValue("left");
+			String rightPath = textValue("right");
+			String sheet = textValue("sheet");
+			if (leftPath == null || leftPath.isBlank() || rightPath == null || rightPath.isBlank()) {
+				outputArea.setText("Provide both left and right file paths before scanning.");
+				return;
+			}
+
+			try {
+				ExcelHeaderReader reader = new ExcelHeaderReader();
+				List<String> leftHeaders = reader.readHeaders(Path.of(leftPath), sheet);
+				List<String> rightHeaders = reader.readHeaders(Path.of(rightPath), sheet);
+				refreshCombo(leftCombo, leftHeaders);
+				refreshCombo(rightCombo, rightHeaders);
+				outputArea.setText("Headers loaded. Select fields and click Add.");
+			} catch (Exception exception) {
+				outputArea.setText("Failed to scan headers: " + exception.getMessage());
+			}
+		}
+
+		private void refreshCombo(JComboBox<String> combo, List<String> values) {
+			combo.removeAllItems();
+			for (String value : values) {
+				if (value != null && !value.isBlank()) {
+					combo.addItem(value);
+				}
+			}
+			combo.setSelectedIndex(combo.getItemCount() > 0 ? 0 : -1);
+		}
+
+		private void addMapping() {
+			Object left = leftCombo.getSelectedItem();
+			Object right = rightCombo.getSelectedItem();
+			if (left == null || right == null) {
+				outputArea.setText("Select both left and right headers.");
+				return;
+			}
+			HeaderPair pair = new HeaderPair(left.toString(), right.toString());
+			mappings.add(pair);
+			updateMappingsArea();
+		}
+
+		private void clearMappings() {
+			mappings.clear();
+			updateMappingsArea();
+		}
+
+		private void updateMappingsArea() {
+			StringBuilder builder = new StringBuilder();
+			for (HeaderPair pair : mappings) {
+				builder.append(pair.left).append(" -> ").append(pair.right).append("\n");
+			}
+			mappingsArea.setText(builder.toString());
+		}
+
+		private List<HeaderPair> getMappings() {
+			return List.copyOf(mappings);
+		}
+	}
+
+	private String textValue(String key) {
+		Object component = inputComponents.get(key);
+		if (component instanceof JTextField field) {
+			return field.getText();
+		}
+		return null;
+	}
+
+	private static class HeaderPair {
+		private final String left;
+		private final String right;
+
+		private HeaderPair(String left, String right) {
+			this.left = left;
+			this.right = right;
+		}
 	}
 }

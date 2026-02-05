@@ -1,11 +1,13 @@
 package org.example.tool;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 public class CliArgs {
-	private final Map<String, String> values = new HashMap<>();
+	private final Map<String, List<String>> values = new HashMap<>();
 
 	public CliArgs(String[] args) {
 		for (int i = 0; i < args.length; i++) {
@@ -19,20 +21,26 @@ public class CliArgs {
 				value = args[i + 1];
 				i++;
 			}
-			values.put(key, value);
+			values.computeIfAbsent(key, ignored -> new ArrayList<>()).add(value);
 		}
 	}
 
 	public String getRequired(String key) {
-		String value = values.get(key);
-		if (value == null) {
+		List<String> list = values.get(key);
+		if (list == null || list.isEmpty()) {
 			throw new IllegalArgumentException("Missing --" + key + " argument");
 		}
-		return value;
+		return list.get(0);
 	}
 
 	public String getOptional(String key) {
-		return values.get(key);
+		List<String> list = values.get(key);
+		return (list == null || list.isEmpty()) ? null : list.get(0);
+	}
+
+	public List<String> getAll(String key) {
+		List<String> list = values.get(key);
+		return list == null ? List.of() : List.copyOf(list);
 	}
 
 	public boolean has(String key) {
