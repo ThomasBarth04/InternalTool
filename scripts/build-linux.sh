@@ -32,7 +32,7 @@ jpackage \
   --input "$INPUT_DIR" \
   --main-jar "$JAR_NAME" \
   --main-class "org.example.Main" \
-  --class-path "$CLASSPATH"
+  --classpath "$CLASSPATH"
 
 tar -czf "$DIST_DIR/${APP_NAME}-${VERSION}-linux.tar.gz" -C "$DIST_DIR" "$APP_NAME"
 

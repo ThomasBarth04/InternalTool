@@ -31,6 +31,6 @@ jpackage \
   --input "$INPUT_DIR" \
   --main-jar "$JAR_NAME" \
   --main-class "org.example.Main" \
-  --class-path "$CLASSPATH"
+  --classpath "$CLASSPATH"
 
 echo "Created $DIST_DIR/$APP_NAME-$VERSION.dmg"
