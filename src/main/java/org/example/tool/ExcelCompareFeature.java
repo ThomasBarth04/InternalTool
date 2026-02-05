@@ -31,7 +31,6 @@ public class ExcelCompareFeature implements ToolFeature {
 		UNION,
 		LEFT_ONLY,
 		RIGHT_ONLY,
-		SYMMETRIC_DIFF,
 		CHANGES
 	}
 
@@ -60,7 +59,7 @@ public class ExcelCompareFeature implements ToolFeature {
 						"mode",
 						"Comparison mode",
 						false,
-						java.util.List.of("union", "left-only", "right-only", "symmetric-diff", "changes (old - new)")
+						java.util.List.of("union", "left-only", "right-only",  "changes (old - new)")
 				),
 				FeatureArgument.text("sheet", "Sheet name (optional)", false),
 				FeatureArgument.mapping("map", "Header mapping", true)
@@ -91,10 +90,7 @@ public class ExcelCompareFeature implements ToolFeature {
 				case "right-only":
 					mode = Mode.RIGHT_ONLY;
 					break;
-				case "symmetric-diff":
-					mode = Mode.SYMMETRIC_DIFF;
-					break;
-				case "changes":
+				case "changes (old - new)":
 					mode = Mode.CHANGES;
 					break;
 				default:
@@ -140,17 +136,6 @@ public class ExcelCompareFeature implements ToolFeature {
 				result.addAll(rightKeys);
 				result.removeAll(leftKeys);
 				printSection(null, rightData.headers, listRows(rightRows, result));
-				return 0;
-			case SYMMETRIC_DIFF:
-				Set<Key> leftOnly = new LinkedHashSet<>(leftKeys);
-				leftOnly.removeAll(rightKeys);
-				Set<Key> rightOnly = new LinkedHashSet<>(rightKeys);
-				rightOnly.removeAll(leftKeys);
-				printSection("LEFT_ONLY", leftData.headers, listRows(leftRows, leftOnly));
-				if (!rightOnly.isEmpty()) {
-					System.out.println();
-					printSection("RIGHT_ONLY", rightData.headers, listRows(rightRows, rightOnly));
-				}
 				return 0;
 			case CHANGES:
 				Set<Key> newContacts = new LinkedHashSet<>(rightKeys);

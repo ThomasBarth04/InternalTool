@@ -15,11 +15,15 @@ import javax.swing.JFrame;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
+import javax.swing.JList;
+import javax.swing.DefaultListModel;
+import javax.swing.ListSelectionModel;
 import javax.swing.JTextArea;
 import javax.swing.JTextField;
 import javax.swing.SwingUtilities;
 import javax.swing.SwingWorker;
 import javax.swing.UIManager;
+import javax.swing.Timer;
 import javax.swing.filechooser.FileNameExtensionFilter;
 import java.awt.BorderLayout;
 import java.awt.Dimension;
@@ -52,6 +56,9 @@ public class GuiApp implements App {
 	private JPanel argsPanel;
 	private JLabel featureDescription;
 	private JComboBox<String> featureSelector;
+	private Timer runTimer;
+	private SwingWorker<Integer, Void> activeWorker;
+	private boolean pendingRun;
 
 	@Override
 	public int run(String[] args) {
@@ -94,9 +101,6 @@ public class GuiApp implements App {
 		JButton exportButton = new JButton("Export Output");
 		exportButton.addActionListener(event -> exportOutput());
 		bottomPanel.add(exportButton, BorderLayout.WEST);
-		JButton runButton = new JButton("Run");
-		runButton.addActionListener(event -> runSelectedFeature());
-		bottomPanel.add(runButton, BorderLayout.EAST);
 		bottomPanel.setBorder(BorderFactory.createEmptyBorder(0, 12, 12, 12));
 
 		frame.add(topPanel, BorderLayout.NORTH);
@@ -104,6 +108,7 @@ public class GuiApp implements App {
 		frame.add(bottomPanel, BorderLayout.SOUTH);
 
 		rebuildArgsPanel();
+		scheduleRun();
 
 		frame.pack();
 		Dimension screen = Toolkit.getDefaultToolkit().getScreenSize();
@@ -157,12 +162,14 @@ public class GuiApp implements App {
 			switch (argument.type()) {
 				case TEXT -> {
 					JTextField field = new JTextField();
+					field.getDocument().addDocumentListener(new SimpleChangeListener(this::scheduleRun));
 					argsPanel.add(field, constraints);
 					inputComponents.put(argument.key(), field);
 				}
 				case FILE -> {
 					JPanel filePanel = new JPanel(new BorderLayout(6, 0));
 					JTextField field = new JTextField();
+					field.getDocument().addDocumentListener(new SimpleChangeListener(this::scheduleRun));
 					JButton browse = new JButton("Browse");
 					browse.addActionListener(event -> chooseFile(field));
 					filePanel.add(field, BorderLayout.CENTER);
@@ -173,11 +180,13 @@ public class GuiApp implements App {
 				case CHOICE -> {
 					JComboBox<String> choices = new JComboBox<>(argument.choices().toArray(String[]::new));
 					choices.setSelectedIndex(-1);
+					choices.addActionListener(event -> scheduleRun());
 					argsPanel.add(choices, constraints);
 					inputComponents.put(argument.key(), choices);
 				}
 				case FLAG -> {
 					JCheckBox checkBox = new JCheckBox();
+					checkBox.addActionListener(event -> scheduleRun());
 					argsPanel.add(checkBox, constraints);
 					inputComponents.put(argument.key(), checkBox);
 				}
@@ -198,6 +207,7 @@ public class GuiApp implements App {
 
 		argsPanel.revalidate();
 		argsPanel.repaint();
+		scheduleRun();
 	}
 
 	private void chooseFile(JTextField field) {
@@ -205,7 +215,28 @@ public class GuiApp implements App {
 		int result = chooser.showOpenDialog(argsPanel);
 		if (result == JFileChooser.APPROVE_OPTION) {
 			field.setText(chooser.getSelectedFile().getAbsolutePath());
+			scheduleRun();
 		}
+	}
+
+	private void scheduleRun() {
+		if (runTimer == null) {
+			runTimer = new Timer(400, event -> startRun());
+			runTimer.setRepeats(false);
+		}
+		pendingRun = true;
+		runTimer.restart();
+	}
+
+	private void startRun() {
+		if (!pendingRun) {
+			return;
+		}
+		if (activeWorker != null) {
+			return;
+		}
+		pendingRun = false;
+		runSelectedFeature();
 	}
 
 	private void runSelectedFeature() {
@@ -227,7 +258,7 @@ public class GuiApp implements App {
 				MappingPanel mappingPanel = (MappingPanel) component;
 				List<HeaderPair> pairs = mappingPanel.getMappings();
 				if (argument.required() && pairs.isEmpty()) {
-					outputArea.setText("Missing required input: " + argument.label());
+					outputArea.setText("Waiting for required inputs.");
 					return;
 				}
 				for (HeaderPair pair : pairs) {
@@ -239,7 +270,7 @@ public class GuiApp implements App {
 
 			String value = readComponentValue(component);
 			if (argument.required() && (value == null || value.isBlank())) {
-				outputArea.setText("Missing required input: " + argument.label());
+				outputArea.setText("Waiting for required inputs.");
 				return;
 			}
 
@@ -250,7 +281,7 @@ public class GuiApp implements App {
 		}
 
 		outputArea.setText("Running...");
-		SwingWorker<Integer, Void> worker = new SwingWorker<>() {
+		activeWorker = new SwingWorker<>() {
 			private String output;
 
 			@Override
@@ -278,9 +309,13 @@ public class GuiApp implements App {
 			@Override
 			protected void done() {
 				outputArea.setText(output == null ? "" : output);
+				activeWorker = null;
+				if (pendingRun) {
+					startRun();
+				}
 			}
 		};
-		worker.execute();
+		activeWorker.execute();
 	}
 
 	private void exportOutput() {
@@ -404,8 +439,8 @@ public class GuiApp implements App {
 	private class MappingPanel extends JPanel {
 		private final JComboBox<String> leftCombo = new JComboBox<>();
 		private final JComboBox<String> rightCombo = new JComboBox<>();
-		private final JTextArea mappingsArea = new JTextArea(4, 30);
-		private final List<HeaderPair> mappings = new ArrayList<>();
+		private final DefaultListModel<HeaderPair> mappingModel = new DefaultListModel<>();
+		private final JList<HeaderPair> mappingList = new JList<>(mappingModel);
 
 		private MappingPanel() {
 			super(new BorderLayout(6, 6));
@@ -442,13 +477,17 @@ public class GuiApp implements App {
 
 			constraints.gridy++;
 			constraints.gridx = 0;
-			constraints.gridwidth = 2;
+			constraints.gridwidth = 1;
+			JButton removeButton = new JButton("Remove");
+			removeButton.addActionListener(event -> removeMapping());
+			controls.add(removeButton, constraints);
+			constraints.gridx = 1;
 			JButton clearButton = new JButton("Clear");
 			clearButton.addActionListener(event -> clearMappings());
 			controls.add(clearButton, constraints);
 
-			mappingsArea.setEditable(false);
-			JScrollPane mappingScroll = new JScrollPane(mappingsArea);
+			mappingList.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
+			JScrollPane mappingScroll = new JScrollPane(mappingList);
 			mappingScroll.setBorder(BorderFactory.createTitledBorder("Mappings"));
 
 			add(controls, BorderLayout.NORTH);
@@ -471,6 +510,7 @@ public class GuiApp implements App {
 				refreshCombo(leftCombo, leftHeaders);
 				refreshCombo(rightCombo, rightHeaders);
 				outputArea.setText("Headers loaded. Select fields and click Add.");
+				scheduleRun();
 			} catch (Exception exception) {
 				outputArea.setText("Failed to scan headers: " + exception.getMessage());
 			}
@@ -494,25 +534,52 @@ public class GuiApp implements App {
 				return;
 			}
 			HeaderPair pair = new HeaderPair(left.toString(), right.toString());
-			mappings.add(pair);
-			updateMappingsArea();
+			mappingModel.addElement(pair);
+			scheduleRun();
+		}
+
+		private void removeMapping() {
+			int index = mappingList.getSelectedIndex();
+			if (index >= 0) {
+				mappingModel.remove(index);
+				scheduleRun();
+			}
 		}
 
 		private void clearMappings() {
-			mappings.clear();
-			updateMappingsArea();
-		}
-
-		private void updateMappingsArea() {
-			StringBuilder builder = new StringBuilder();
-			for (HeaderPair pair : mappings) {
-				builder.append(pair.left).append(" -> ").append(pair.right).append("\n");
-			}
-			mappingsArea.setText(builder.toString());
+			mappingModel.clear();
+			scheduleRun();
 		}
 
 		private List<HeaderPair> getMappings() {
-			return List.copyOf(mappings);
+			List<HeaderPair> list = new ArrayList<>();
+			for (int i = 0; i < mappingModel.size(); i++) {
+				list.add(mappingModel.get(i));
+			}
+			return list;
+		}
+	}
+
+	private static class SimpleChangeListener implements javax.swing.event.DocumentListener {
+		private final Runnable callback;
+
+		private SimpleChangeListener(Runnable callback) {
+			this.callback = callback;
+		}
+
+		@Override
+		public void insertUpdate(javax.swing.event.DocumentEvent event) {
+			callback.run();
+		}
+
+		@Override
+		public void removeUpdate(javax.swing.event.DocumentEvent event) {
+			callback.run();
+		}
+
+		@Override
+		public void changedUpdate(javax.swing.event.DocumentEvent event) {
+			callback.run();
 		}
 	}
 
@@ -531,6 +598,11 @@ public class GuiApp implements App {
 		private HeaderPair(String left, String right) {
 			this.left = left;
 			this.right = right;
+		}
+
+		@Override
+		public String toString() {
+			return left + " -> " + right;
 		}
 	}
 }
