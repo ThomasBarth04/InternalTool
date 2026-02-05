@@ -2,9 +2,16 @@
 set -euo pipefail
 
 APP_NAME="InternalTool"
-VERSION="1.0.0"
+VERSION="${VERSION:-}"
 DIST_DIR="dist"
 INPUT_DIR="$DIST_DIR/input"
+
+if [[ -z "$VERSION" ]]; then
+  VERSION=$(git describe --tags --abbrev=0 2>/dev/null | sed 's/^v//')
+fi
+if [[ -z "$VERSION" ]]; then
+  VERSION="0.0.0"
+fi
 
 if ! command -v jpackage >/dev/null 2>&1; then
   echo "jpackage not found. Install JDK 21+ to get jpackage." >&2

@@ -17,7 +17,7 @@ These commands download the app from GitHub Releases and install it. Copy the wh
 ### macOS
 
 ```bash
-curl -L "https://github.com/ThomasBarth04/InternalTool/releases/download/v1.0.0/InternalTool-1.0.0.dmg" -o /tmp/InternalTool.dmg && hdiutil attach /tmp/InternalTool.dmg -nobrowse && cp -R /Volumes/InternalTool/InternalTool.app /Applications && hdiutil detach /Volumes/InternalTool
+TAG=$(curl -fsSL https://api.github.com/repos/ThomasBarth04/InternalTool/releases/latest | grep -m1 '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/') && VER=${TAG#v} && curl -L "https://github.com/ThomasBarth04/InternalTool/releases/download/${TAG}/InternalTool-${VER}.dmg" -o /tmp/InternalTool.dmg && hdiutil attach /tmp/InternalTool.dmg -nobrowse && cp -R /Volumes/InternalTool/InternalTool.app /Applications && hdiutil detach /Volumes/InternalTool
 ```
 
 What this does:
@@ -31,7 +31,7 @@ After it finishes, open **Applications** and click **InternalTool**.
 ### Linux
 
 ```bash
-curl -L "https://github.com/ThomasBarth04/InternalTool/releases/download/v1.0.0/InternalTool-1.0.0-linux.tar.gz" -o /tmp/InternalTool.tar.gz && mkdir -p ~/InternalTool && tar -xzf /tmp/InternalTool.tar.gz -C ~/InternalTool && ~/InternalTool/InternalTool/bin/InternalTool
+TAG=$(curl -fsSL https://api.github.com/repos/ThomasBarth04/InternalTool/releases/latest | grep -m1 '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/') && VER=${TAG#v} && curl -L "https://github.com/ThomasBarth04/InternalTool/releases/download/${TAG}/InternalTool-${VER}-linux.tar.gz" -o /tmp/InternalTool.tar.gz && mkdir -p ~/InternalTool && tar -xzf /tmp/InternalTool.tar.gz -C ~/InternalTool && ~/InternalTool/InternalTool/bin/InternalTool
 ```
 
 What this does:

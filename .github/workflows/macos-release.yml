@@ -26,7 +26,7 @@ jobs:
       - name: Build DMG
         run: |
           chmod +x scripts/build-macos.sh
-          ./scripts/build-macos.sh
+          VERSION="${GITHUB_REF_NAME#v}" ./scripts/build-macos.sh
 
       - name: Upload DMG artifact
         uses: actions/upload-artifact@v4

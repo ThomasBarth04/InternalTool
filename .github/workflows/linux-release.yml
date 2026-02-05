@@ -26,7 +26,7 @@ jobs:
       - name: Build Linux bundle
         run: |
           chmod +x scripts/build-linux.sh
-          ./scripts/build-linux.sh
+          VERSION="${GITHUB_REF_NAME#v}" ./scripts/build-linux.sh
 
       - name: Upload Linux artifact
         uses: actions/upload-artifact@v4
