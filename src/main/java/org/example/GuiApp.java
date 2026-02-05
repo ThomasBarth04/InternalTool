@@ -122,18 +122,14 @@ public class GuiApp implements App {
 
 	private void applyScaling() {
 		Dimension screen = Toolkit.getDefaultToolkit().getScreenSize();
-		double scale = Math.max(2, screen.width / 1920.0);
-		scale = Math.min(scale, 2);
-		Font baseFont = UIManager.getFont("Label.font");
-		if (baseFont == null) {
-			return;
-		}
-		Font scaled = baseFont.deriveFont((float) (baseFont.getSize2D() * scale));
+		double scale = Math.max(1.0, screen.width / 1920.0);
+		scale = Math.min(scale, 2.0);
 		Enumeration<Object> keys = UIManager.getDefaults().keys();
 		while (keys.hasMoreElements()) {
 			Object key = keys.nextElement();
 			Object value = UIManager.get(key);
-			if (value instanceof Font) {
+			if (value instanceof Font font) {
+				Font scaled = font.deriveFont((float) (font.getSize2D() * scale));
 				UIManager.put(key, scaled);
 			}
 		}
