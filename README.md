@@ -1,14 +1,16 @@
 # InternalTool
 
-InternalTool is a small desktop app for comparing Excel files with flexible header mapping.
-
+InternalTool idea for support, so we can do reduce repetitive tasks (mac and linux)
+    
 ## Using the app
+There is not a great UI yet and maybe only i understand how to use it now since i made it ;). But can show and explain + update to make it easier to understand.
 
 - Pick the feature from the dropdown (currently `excel-compare`).
 - Provide the left/right Excel files and optional sheet name.
-- Set the comparison mode (union, left-only, right-only, changes).
-- Use the header mapping panel: click Scan Headers, select left/right columns, then Add.
-- Click the `?` button to see a full description of the feature and its configuration options.
+- Set the comparison mode (union, left-only, right-only, changes). If using changes the idea is that the left Excel file is the old contact list and the right is the new contact list
+- Use the header mapping panel: click Scan Headers, select left/right columns, then Add. This makes it so we can specify which fields to compare and it makes it so inconsistencies in the Excel headers dosnt matter.
+- So if one has a field called E-Mail and the other has epost, we can just map E-mail -> epost and it will understand that it should compare those fields.
+- Click the `?` button to see a full description of the feature and its configuration options. (needs a lot of improvement for the description)
 
 ## Install (one-line)
 
@@ -47,4 +49,4 @@ Next time, you can start it with:
 
 ## Need help?
 
-If a command fails, copy the error message and send it to the maintainer.
+If a command fails, copy the error message and send it to Thomas.
