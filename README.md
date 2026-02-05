@@ -2,6 +2,14 @@
 
 InternalTool is a small desktop app for comparing Excel files with flexible header mapping.
 
+## Using the app
+
+- Pick the feature from the dropdown (currently `excel-compare`).
+- Provide the left/right Excel files and optional sheet name.
+- Set the comparison mode (union, left-only, right-only, changes).
+- Use the header mapping panel: click Scan Headers, select left/right columns, then Add.
+- Click the `?` button to see a full description of the feature and its configuration options.
+
 ## Install (one-line)
 
 These commands download the app from GitHub Releases and install it. Copy the whole line and paste it into Terminal.

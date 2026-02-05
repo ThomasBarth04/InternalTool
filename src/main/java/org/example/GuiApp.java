@@ -13,6 +13,7 @@ import javax.swing.JComboBox;
 import javax.swing.JFileChooser;
 import javax.swing.JFrame;
 import javax.swing.JLabel;
+import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
 import javax.swing.JList;
@@ -80,6 +81,11 @@ public class GuiApp implements App {
 		featureSelector.addActionListener(event -> rebuildArgsPanel());
 		topPanel.add(new JLabel("Feature"), BorderLayout.WEST);
 		topPanel.add(featureSelector, BorderLayout.CENTER);
+		JButton helpButton = new JButton("?");
+		helpButton.setToolTipText("Show feature help");
+		helpButton.setMargin(new Insets(2, 8, 2, 8));
+		helpButton.addActionListener(event -> showHelp(frame));
+		topPanel.add(helpButton, BorderLayout.EAST);
 		featureDescription = new JLabel();
 		topPanel.add(featureDescription, BorderLayout.SOUTH);
 		topPanel.setBorder(BorderFactory.createEmptyBorder(12, 12, 0, 12));
@@ -213,6 +219,34 @@ public class GuiApp implements App {
 			field.setText(chooser.getSelectedFile().getAbsolutePath());
 			scheduleRun();
 		}
+	}
+
+	private void showHelp(JFrame frame) {
+		ToolFeature feature = getSelectedFeature();
+		String text = buildHelpText(feature);
+		JOptionPane.showMessageDialog(frame, text, "Feature Help", JOptionPane.INFORMATION_MESSAGE);
+	}
+
+	private String buildHelpText(ToolFeature feature) {
+		StringBuilder builder = new StringBuilder();
+		builder.append(feature.name()).append("\n");
+		builder.append(feature.description()).append("\n\n");
+		builder.append("Usage:\n").append(feature.usage()).append("\n\n");
+		builder.append("Arguments:\n");
+		for (FeatureArgument argument : feature.arguments()) {
+			builder.append("- ")
+					.append(argument.label())
+					.append(argument.required() ? " (required)" : " (optional)")
+					.append("\n");
+			builder.append("  Type: ").append(argument.type().name().toLowerCase(Locale.ROOT)).append("\n");
+			if (argument.type() == FeatureArgument.Type.CHOICE && !argument.choices().isEmpty()) {
+				builder.append("  Options: ").append(String.join(", ", argument.choices())).append("\n");
+			}
+			if (argument.type() == FeatureArgument.Type.MAPPING) {
+				builder.append("  Tip: Use Scan Headers, then pick left/right columns and click Add.\n");
+			}
+		}
+		return builder.toString().trim();
 	}
 
 	private void scheduleRun() {
